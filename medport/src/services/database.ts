@@ -64,7 +64,7 @@ function notifyDataChanged(source: string) {
 
 // Set up broadcast channel listener
 if (broadcastChannel) {
-  broadcastChannel.onmessage = (event) => {
+  broadcastChannel.onmessage = (event: MessageEvent) => {
     console.log('Received message from another tab:', event.data);
     // Notify listeners when we receive an update from another tab
     notifyDataChanged('broadcast');
