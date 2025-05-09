@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -7,13 +7,15 @@ import Navbar from './components/Navbar';
 import PatientForm, { type PatientFormData } from './components/PatientForm';
 import PatientTable from './components/PatientTable';
 import SqlQueryTool from './components/SqlQueryTool';
+import LocalStorageSync from './components/LocalStorageSync';
 
 // Database services
 import { 
   initDatabase, 
   getAllPatients, 
   executeQuery,
-  addPatient
+  addPatient,
+  addUpdateListener
 } from './services/database';
 
 // Models
@@ -26,16 +28,27 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
+  // Function to load patients data
+  const loadPatients = useCallback(async () => {
+    try {
+      console.log('Loading patients data...');
+      const patientData = await getAllPatients();
+      console.log('Patients loaded:', patientData);
+      setPatients(patientData);
+      return patientData;
+    } catch (err) {
+      console.error('Error loading patients:', err);
+      throw err;
+    }
+  }, []);
+
   // Initialize database and load patients
   useEffect(() => {
-    const loadData = async () => {
+    const initApp = async () => {
       try {
         console.log('Initializing database...');
         await initDatabase();
-        console.log('Loading patients...');
-        const patientData = await getAllPatients();
-        console.log('Patients loaded:', patientData);
-        setPatients(patientData);
+        await loadPatients();
         setLoading(false);
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -44,8 +57,35 @@ function App() {
       }
     };
 
-    loadData();
-  }, [lastRefresh]);
+    initApp();
+  }, [lastRefresh, loadPatients]);
+
+  // Set up listener for data changes from other tabs
+  useEffect(() => {
+    console.log('Setting up data update listener');
+    
+    // This function will be called whenever data changes in any tab
+    const handleDataUpdate = async () => {
+      console.log('Data update detected, refreshing patients...');
+      try {
+        setLoading(true);
+        await loadPatients();
+        setLoading(false);
+      } catch (err) {
+        console.error('Error refreshing data after update:', err);
+        setLoading(false);
+      }
+    };
+    
+    // Register the listener and get the cleanup function
+    const removeListener = addUpdateListener(handleDataUpdate);
+    
+    // Clean up the listener when the component unmounts
+    return () => {
+      console.log('Cleaning up data update listener');
+      removeListener();
+    };
+  }, [loadPatients]);
 
   // Function to refresh data
   const refreshData = () => {
@@ -71,8 +111,7 @@ function App() {
       console.log('Patient added:', addedPatient);
       
       // Refresh the patient list
-      const updatedPatients = await getAllPatients();
-      setPatients(updatedPatients);
+      await loadPatients();
       
       setLoading(false);
       alert('Patient registered successfully!');
@@ -90,7 +129,6 @@ function App() {
       const results = await executeQuery(query);
       console.log('Query results:', results);
       setQueryResults(results);
-      setLoading(false);
       
       // If it was a modification query (INSERT, UPDATE, DELETE), refresh patient list
       const lowerQuery = query.toLowerCase().trim();
@@ -100,9 +138,10 @@ function App() {
         lowerQuery.startsWith('delete')
       ) {
         console.log('Modification query detected, refreshing patient list');
-        const updatedPatients = await getAllPatients();
-        setPatients(updatedPatients);
+        await loadPatients();
       }
+      
+      setLoading(false);
     } catch (err: any) {
       console.error('Query execution error:', err);
       setQueryResults([]);
@@ -155,6 +194,9 @@ function App() {
 
   return (
     <div className="container-fluid p-0">
+      {/* Include the LocalStorageSync component for cross-tab communication */}
+      <LocalStorageSync onDataChange={loadPatients} />
+      
       {/* Navbar */}
       <Navbar />
 
@@ -167,7 +209,7 @@ function App() {
 
           {/* Bottom-left: Table */}
           <div className="d-flex justify-content-between align-items-center mb-2">
-            <h5>Patient Records</h5>
+            <h5>Patient Records ({patients.length})</h5>
             <button 
               className="btn btn-outline-secondary btn-sm" 
               onClick={refreshData}
@@ -181,6 +223,15 @@ function App() {
               ) : 'Refresh Data'}
             </button>
           </div>
+          
+          {loading && patients.length > 0 && (
+            <div className="alert alert-info">
+              <div className="d-flex align-items-center">
+                <div className="spinner-border spinner-border-sm me-2" role="status"></div>
+                <div>Refreshing patient data...</div>
+              </div>
+            </div>
+          )}
           
           <PatientTable 
             patients={patients} 
