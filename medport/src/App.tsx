@@ -1,52 +1,157 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
 // Components
 import Navbar from './components/Navbar';
-import PatientForm from './components/PatientForm';
+import PatientForm, { type PatientFormData } from './components/PatientForm';
 import PatientTable from './components/PatientTable';
 import SqlQueryTool from './components/SqlQueryTool';
 
+// Database services
+import { 
+  initDatabase, 
+  getAllPatients, 
+  executeQuery,
+  addPatient
+} from './services/database';
+
+// Models
+import type { Patient } from './models/Patient';
+
 function App() {
-  // Define patient data directly in App component
-  const patientData = [
-    { id: 1, name: 'John Doe', age: 45, department: 'Cardiology' },
-    { id: 2, name: 'Jane Smith', age: 32, department: 'Neurology' },
-    { id: 3, name: 'Robert Johnson', age: 58, department: 'Orthopedics' },
-    { id: 4, name: 'Emily Davis', age: 27, department: 'Pediatrics' },
-    { id: 5, name: 'Michael Wilson', age: 63, department: 'Oncology' },
-  ];
-
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [queryResults, setQueryResults] = useState<any[]>([]);
-  const [patients, setPatients] = useState(patientData);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  const handleFormSubmit = (formData: {
-    patientId: string;
-    patientName: string;
-    department: string;
-  }) => {
-    console.log('Form submitted:', formData);
-    // Here you would typically send the data to your backend
-    alert('Patient data submitted!');
+  // Initialize database and load patients
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        console.log('Initializing database...');
+        await initDatabase();
+        console.log('Loading patients...');
+        const patientData = await getAllPatients();
+        console.log('Patients loaded:', patientData);
+        setPatients(patientData);
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to load data:', err);
+        setError(`Failed to load patient data: ${err instanceof Error ? err.message : String(err)}`);
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [lastRefresh]);
+
+  // Function to refresh data
+  const refreshData = () => {
+    setLoading(true);
+    setLastRefresh(new Date());
   };
 
-  const handleExecuteQuery = (query: string) => {
-    console.log('Executing query:', query);
-    // This is where you would typically send the query to your backend
-    // For now, we'll just simulate a response
-    setQueryResults(patientData);
+  const handleFormSubmit = async (formData: PatientFormData) => {
+    try {
+      setLoading(true);
+      
+      // Convert form data to patient data
+      const newPatient = {
+        name: formData.patientName,
+        age: formData.age,
+        department: formData.department
+      };
+      
+      console.log('Adding new patient:', newPatient);
+      
+      // Add patient to database
+      const addedPatient = await addPatient(newPatient);
+      console.log('Patient added:', addedPatient);
+      
+      // Refresh the patient list
+      const updatedPatients = await getAllPatients();
+      setPatients(updatedPatients);
+      
+      setLoading(false);
+      alert('Patient registered successfully!');
+    } catch (err) {
+      console.error('Error submitting patient:', err);
+      alert('Failed to register patient.');
+      setLoading(false);
+    }
   };
 
-  const handleViewPatient = (patient: any) => {
+  const handleExecuteQuery = async (query: string) => {
+    try {
+      setLoading(true);
+      console.log('Executing query:', query);
+      const results = await executeQuery(query);
+      console.log('Query results:', results);
+      setQueryResults(results);
+      setLoading(false);
+      
+      // If it was a modification query (INSERT, UPDATE, DELETE), refresh patient list
+      const lowerQuery = query.toLowerCase().trim();
+      if (
+        lowerQuery.startsWith('insert') || 
+        lowerQuery.startsWith('update') || 
+        lowerQuery.startsWith('delete')
+      ) {
+        console.log('Modification query detected, refreshing patient list');
+        const updatedPatients = await getAllPatients();
+        setPatients(updatedPatients);
+      }
+    } catch (err: any) {
+      console.error('Query execution error:', err);
+      setQueryResults([]);
+      alert(`Query error: ${err.message || 'Unknown error'}`);
+      setLoading(false);
+    }
+  };
+
+  const handleViewPatient = (patient: Patient) => {
     console.log('Viewing patient:', patient);
-    // Implement view functionality
+    // Show patient details in a modal or alert
+    alert(`
+      Patient Details:
+      ID: ${patient.id}
+      Name: ${patient.name}
+      Age: ${patient.age}
+      Department: ${patient.department}
+    `);
   };
 
-  const handleEditPatient = (patient: any) => {
+  const handleEditPatient = (patient: Patient) => {
     console.log('Editing patient:', patient);
-    // Implement edit functionality
+    // In a real app, you would open a modal with a form
+    // For now, just show an alert
+    alert(`Editing patient: ${patient.name} - This would open an edit form in a real app.`);
   };
+
+  if (loading && patients.length === 0) {
+    return (
+      <div className="container d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-danger" role="alert">
+          <h4 className="alert-heading">Database Error</h4>
+          <p>{error}</p>
+          <hr />
+          <p className="mb-0">Please check the console for more details.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container-fluid p-0">
@@ -61,6 +166,22 @@ function App() {
           <PatientForm onSubmit={handleFormSubmit} />
 
           {/* Bottom-left: Table */}
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <h5>Patient Records</h5>
+            <button 
+              className="btn btn-outline-secondary btn-sm" 
+              onClick={refreshData}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                  Refreshing...
+                </>
+              ) : 'Refresh Data'}
+            </button>
+          </div>
+          
           <PatientTable 
             patients={patients} 
             onView={handleViewPatient} 

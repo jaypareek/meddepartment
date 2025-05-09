@@ -5,6 +5,7 @@ interface PatientFormData {
   patientId: string;
   patientName: string;
   department: string;
+  age: number;
 }
 
 interface PatientFormProps {
@@ -15,19 +16,28 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit }) => {
   const [formData, setFormData] = useState<PatientFormData>({
     patientId: '',
     patientName: '',
-    department: ''
+    department: '',
+    age: 30
   });
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
+    
+    // Reset form after submission
+    setFormData({
+      patientId: '',
+      patientName: '',
+      department: '',
+      age: 30
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: value
+      [name]: name === 'age' ? parseInt(value) || 0 : value
     });
   };
 
@@ -40,7 +50,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit }) => {
         <form onSubmit={handleFormSubmit}>
           <div className="row mb-3">
             <div className="col">
-              <label htmlFor="patientId" className="form-label">Patient ID</label>
+              <label htmlFor="patientId" className="form-label">Patient ID (Optional)</label>
               <input 
                 type="text" 
                 className="form-control" 
@@ -48,7 +58,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit }) => {
                 name="patientId"
                 value={formData.patientId}
                 onChange={handleInputChange}
-                required
+                placeholder="Auto-generated if empty"
               />
             </div>
             <div className="col">
@@ -64,25 +74,44 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit }) => {
               />
             </div>
           </div>
-          <div className="mb-3">
-            <label htmlFor="department" className="form-label">Department</label>
-            <select 
-              className="form-select" 
-              id="department" 
-              name="department"
-              value={formData.department}
-              onChange={handleInputChange}
-              required
-            >
-              <option value="">Select Department</option>
-              <option value="cardiology">Cardiology</option>
-              <option value="neurology">Neurology</option>
-              <option value="orthopedics">Orthopedics</option>
-              <option value="pediatrics">Pediatrics</option>
-              <option value="oncology">Oncology</option>
-            </select>
+          <div className="row mb-3">
+            <div className="col">
+              <label htmlFor="age" className="form-label">Age</label>
+              <input 
+                type="number" 
+                className="form-control" 
+                id="age" 
+                name="age"
+                min="0"
+                max="120"
+                value={formData.age}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div className="col">
+              <label htmlFor="department" className="form-label">Department</label>
+              <select 
+                className="form-select" 
+                id="department" 
+                name="department"
+                value={formData.department}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Select Department</option>
+                <option value="Cardiology">Cardiology</option>
+                <option value="Neurology">Neurology</option>
+                <option value="Orthopedics">Orthopedics</option>
+                <option value="Pediatrics">Pediatrics</option>
+                <option value="Oncology">Oncology</option>
+                <option value="General">General</option>
+                <option value="Emergency">Emergency</option>
+                <option value="Surgery">Surgery</option>
+              </select>
+            </div>
           </div>
-          <button type="submit" className="btn btn-primary">Submit</button>
+          <button type="submit" className="btn btn-primary">Register Patient</button>
         </form>
       </div>
     </div>
