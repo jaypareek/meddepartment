@@ -1,0 +1,32 @@
+/* App.css */
+.code-font {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.query-results {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+/* Custom scrollbar for the query results */
+.query-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.query-results::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.query-results::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.query-results::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
